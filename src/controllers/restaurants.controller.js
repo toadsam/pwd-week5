@@ -29,8 +29,8 @@ exports.getRestaurant = asyncHandler(async (req, res) => {
   const restaurant = await restaurantService.getRestaurantById(req.params.id);
 
   if (!restaurant) {
-    res.status(404).json({ error: { message: 'Restaurant not found' } });
-    return;
+    // ✅ “throw”로 던져야 wrapAsync가 catch함
+    throw new Error('Restaurant not found'); // 메시지에 'not found' 포함
   }
 
   res.json({ data: restaurant });
@@ -41,6 +41,11 @@ exports.createRestaurant = asyncHandler(async (req, res) => {
     ...req.body,
     recommendedMenu: normaliseMenu(req.body?.recommendedMenu)
   };
+
+  // ✅ category 필드 검증 추가
+  if (!payload.category) {
+    throw new Error("'category' is required"); // 메시지에 'required' 포함
+  }
 
   const restaurant = await restaurantService.createRestaurant(payload);
   res.status(201).json({ data: restaurant });
@@ -54,8 +59,7 @@ exports.updateRestaurant = asyncHandler(async (req, res) => {
 
   const updated = await restaurantService.updateRestaurant(req.params.id, payload);
   if (!updated) {
-    res.status(404).json({ error: { message: 'Restaurant not found' } });
-    return;
+    throw new Error('Restaurant not found');
   }
   res.json({ data: updated });
 });
@@ -63,8 +67,7 @@ exports.updateRestaurant = asyncHandler(async (req, res) => {
 exports.deleteRestaurant = asyncHandler(async (req, res) => {
   const deleted = await restaurantService.deleteRestaurant(req.params.id);
   if (!deleted) {
-    res.status(404).json({ error: { message: 'Restaurant not found' } });
-    return;
+    throw new Error('Restaurant not found');
   }
   res.status(204).send();
 });
