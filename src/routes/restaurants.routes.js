@@ -4,6 +4,17 @@ const restaurantService = require('../services/restaurants.service');
 
 const router = express.Router();
 
+// ✅ 인기 맛집 라우트 추가
+router.get('/popular', async (req, res) => {
+  try {
+    const limit = Number(req.query.limit) || 5;
+    const data = await restaurantService.getPopularRestaurants(limit);
+    res.status(200).json({ data });
+  } catch (err) {
+    res.status(500).json({ error: { message: err.message } });
+  }
+});
+
 router.get('/', async (req, res) => {
   try {
     const data = await restaurantService.getAllRestaurants();
