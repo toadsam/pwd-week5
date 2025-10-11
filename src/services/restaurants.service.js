@@ -1,10 +1,11 @@
-// src/services/restaurants.service.js
 const path = require('path');
 const { readFileSync } = require('fs');
+const mongoose = require('mongoose');
 const Restaurant = require('../models/restaurant.model');
 
 const DATA_PATH = path.join(__dirname, '..', 'data', 'restaurants.json');
 
+// ------------------- 기본 유틸 -------------------
 function readSeedDataSync() {
   const raw = readFileSync(DATA_PATH, 'utf8');
   return JSON.parse(raw);
@@ -15,8 +16,8 @@ async function getNextRestaurantId() {
   return (max?.id || 0) + 1;
 }
 
+// ------------------- 조회 관련 -------------------
 function getAllRestaurantsSync() {
-  // 동기 데모 전용: 파일에서 즉시 반환
   const data = readSeedDataSync();
   return JSON.parse(JSON.stringify(data));
 }
@@ -27,16 +28,29 @@ async function getAllRestaurants() {
 }
 
 async function getRestaurantById(id) {
-  const numericId = Number(id);
-  const doc = await Restaurant.findOne({ id: numericId }).lean();
+  let doc;
+
+  // ✅ _id(ObjectId)로 먼저 시도
+  if (mongoose.Types.ObjectId.isValid(id)) {
+    doc = await Restaurant.findById(id).lean();
+  } else {
+    // ✅ 숫자형 id로 시도
+    const numericId = Number(id);
+    doc = await Restaurant.findOne({ id: numericId }).lean();
+  }
+
   return doc || null;
 }
 
 async function getPopularRestaurants(limit = 5) {
-  const docs = await Restaurant.find({}).sort({ rating: -1 }).limit(limit).lean();
+  const docs = await Restaurant.find({})
+    .sort({ rating: -1 })
+    .limit(limit)
+    .lean();
   return docs;
 }
 
+// ------------------- 생성 -------------------
 async function createRestaurant(payload) {
   const requiredFields = ['name', 'category', 'location'];
   const missingField = requiredFields.find((field) => !payload[field]);
@@ -57,11 +71,78 @@ async function createRestaurant(payload) {
     description: payload.description ?? '',
     recommendedMenu: Array.isArray(payload.recommendedMenu) ? payload.recommendedMenu : [],
     likes: 0,
-    image: payload.image ?? ''
+    image: payload.image ?? '',
   });
   return doc.toObject();
 }
 
+// ------------------- 수정 -------------------
+async function updateRestaurant(id, payload) {
+  let updated;
+
+  if (mongoose.Types.ObjectId.isValid(id)) {
+    // ✅ _id로 수정
+    updated = await Restaurant.findByIdAndUpdate(
+      id,
+      {
+        $set: {
+          name: payload.name,
+          category: payload.category,
+          location: payload.location,
+          priceRange: payload.priceRange,
+          rating: payload.rating,
+          description: payload.description,
+          recommendedMenu: Array.isArray(payload.recommendedMenu)
+            ? payload.recommendedMenu
+            : undefined,
+          image: payload.image,
+        },
+      },
+      { new: true, runValidators: true, lean: true }
+    );
+  } else {
+    // ✅ 숫자형 id로 수정
+    const numericId = Number(id);
+    updated = await Restaurant.findOneAndUpdate(
+      { id: numericId },
+      {
+        $set: {
+          name: payload.name,
+          category: payload.category,
+          location: payload.location,
+          priceRange: payload.priceRange,
+          rating: payload.rating,
+          description: payload.description,
+          recommendedMenu: Array.isArray(payload.recommendedMenu)
+            ? payload.recommendedMenu
+            : undefined,
+          image: payload.image,
+        },
+      },
+      { new: true, runValidators: true, lean: true }
+    );
+  }
+
+  return updated;
+}
+
+// ------------------- 삭제 -------------------
+async function deleteRestaurant(id) {
+  let deleted;
+
+  if (mongoose.Types.ObjectId.isValid(id)) {
+    // ✅ _id로 삭제
+    deleted = await Restaurant.findByIdAndDelete(id).lean();
+  } else {
+    // ✅ 숫자 id로 삭제
+    const numericId = Number(id);
+    deleted = await Restaurant.findOneAndDelete({ id: numericId }).lean();
+  }
+
+  return deleted;
+}
+
+// ------------------- 시드 초기화 -------------------
 async function resetStore() {
   const seed = readSeedDataSync();
   await Restaurant.deleteMany({});
@@ -76,33 +157,7 @@ async function ensureSeededOnce() {
   return { seeded: true, count: seed.length };
 }
 
-async function updateRestaurant(id, payload) {
-  const numericId = Number(id);
-  const updated = await Restaurant.findOneAndUpdate(
-    { id: numericId },
-    {
-      $set: {
-        name: payload.name,
-        category: payload.category,
-        location: payload.location,
-        priceRange: payload.priceRange,
-        rating: payload.rating,
-        description: payload.description,
-        recommendedMenu: Array.isArray(payload.recommendedMenu) ? payload.recommendedMenu : undefined,
-        image: payload.image,
-      }
-    },
-    { new: true, runValidators: true, lean: true }
-  );
-  return updated;
-}
-
-async function deleteRestaurant(id) {
-  const numericId = Number(id);
-  const deleted = await Restaurant.findOneAndDelete({ id: numericId }).lean();
-  return deleted;
-}
-
+// ------------------- export -------------------
 module.exports = {
   getAllRestaurants,
   getAllRestaurantsSync,
