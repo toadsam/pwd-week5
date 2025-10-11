@@ -1,3 +1,4 @@
+// src/services/restaurants.service.js
 const path = require('path');
 const { readFileSync } = require('fs');
 const mongoose = require('mongoose');
@@ -34,9 +35,11 @@ async function getRestaurantById(id) {
   if (mongoose.Types.ObjectId.isValid(id)) {
     doc = await Restaurant.findById(id).lean();
   } else {
-    // ✅ 숫자형 id로 시도
+    // ✅ 숫자형/문자열 id로 시도
     const numericId = Number(id);
-    doc = await Restaurant.findOne({ id: numericId }).lean();
+    doc = await Restaurant.findOne({
+      $or: [{ id: numericId }, { id: id.toString() }],
+    }).lean();
   }
 
   return doc || null;
@@ -69,7 +72,9 @@ async function createRestaurant(payload) {
     priceRange: payload.priceRange ?? '정보 없음',
     rating: payload.rating ?? 0,
     description: payload.description ?? '',
-    recommendedMenu: Array.isArray(payload.recommendedMenu) ? payload.recommendedMenu : [],
+    recommendedMenu: Array.isArray(payload.recommendedMenu)
+      ? payload.recommendedMenu
+      : [],
     likes: 0,
     image: payload.image ?? '',
   });
@@ -81,7 +86,7 @@ async function updateRestaurant(id, payload) {
   let updated;
 
   if (mongoose.Types.ObjectId.isValid(id)) {
-    // ✅ _id로 수정
+    // ✅ _id(ObjectId) 기준 수정
     updated = await Restaurant.findByIdAndUpdate(
       id,
       {
@@ -101,10 +106,10 @@ async function updateRestaurant(id, payload) {
       { new: true, runValidators: true, lean: true }
     );
   } else {
-    // ✅ 숫자형 id로 수정
+    // ✅ 숫자형 or 문자열 id 기준 수정
     const numericId = Number(id);
     updated = await Restaurant.findOneAndUpdate(
-      { id: numericId },
+      { $or: [{ id: numericId }, { id: id.toString() }] },
       {
         $set: {
           name: payload.name,
@@ -131,12 +136,14 @@ async function deleteRestaurant(id) {
   let deleted;
 
   if (mongoose.Types.ObjectId.isValid(id)) {
-    // ✅ _id로 삭제
+    // ✅ _id(ObjectId) 기준 삭제
     deleted = await Restaurant.findByIdAndDelete(id).lean();
   } else {
-    // ✅ 숫자 id로 삭제
+    // ✅ 숫자형 or 문자열 id 기준 삭제
     const numericId = Number(id);
-    deleted = await Restaurant.findOneAndDelete({ id: numericId }).lean();
+    deleted = await Restaurant.findOneAndDelete({
+      $or: [{ id: numericId }, { id: id.toString() }],
+    }).lean();
   }
 
   return deleted;
